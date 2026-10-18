@@ -263,6 +263,27 @@ STUDENT QUESTION:
             )
             response.raise_for_status()
             answer = response.json()["choices"][0]["message"]["content"]
+        
+        elif llm_provider == "groq":
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                return "Error: GROQ_API_KEY is not configured.", retrieved_chunks
+
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": os.getenv("GROQ_MODEL", "openai/gpt-oss-20b"),
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                },
+                timeout=120,
+            )
+            response.raise_for_status()
+            answer = response.json()["choices"][0]["message"]["content"]
 
         else:
             return f"Error: Unsupported LLM_PROVIDER '{llm_provider}'.", retrieved_chunks
@@ -279,26 +300,6 @@ STUDENT QUESTION:
 
 
     
-    # --------------------------------------------------------
-    # 7. Handle Ollama errors
-    # --------------------------------------------------------
-
-    if response.status_code != 200:
-
-        return (
-            f"Error communicating with Ollama: {response.text}",
-            retrieved_chunks
-        )
-
-
-    # --------------------------------------------------------
-    # 8. Get generated answer
-    # --------------------------------------------------------
-
-    result = response.json()
-
-    answer = result["message"]["content"]
-
 
     # --------------------------------------------------------
     # 9. Save conversation memory
