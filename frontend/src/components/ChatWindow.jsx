@@ -44,3 +44,4 @@ export default function ChatWindow({ messages, loading, onSuggest }) {
     </div>
   );
 }
+

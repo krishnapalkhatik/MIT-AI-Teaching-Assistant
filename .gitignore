@@ -9,10 +9,13 @@ __pycache__/
 venv/
 
 # Generated / large project data
-data/
+data/*
+!data/faiss_index.index
+!data/metadata.pkl
 transcripts/
 videos/
 whisper/
 
 # Local outputs
 *.log
+/scripts/app.py

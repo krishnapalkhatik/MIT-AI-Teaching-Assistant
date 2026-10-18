@@ -3,7 +3,7 @@ import pickle
 import requests
 import faiss
 from sentence_transformers import SentenceTransformer
-
+import os
 
 # ============================================================
 # PATHS
@@ -21,13 +21,9 @@ METADATA_PATH = BASE_DIR / "data" / "metadata.pkl"
 
 print("Loading embedding model...")
 
-model_path = (
-    r"C:\Users\Krishna Pal\.cache\huggingface\hub"
-    r"\models--sentence-transformers--all-MiniLM-L6-v2"
-    r"\snapshots\1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
-)
+model_name = "sentence-transformers/all-MiniLM-L6-v2"
 
-model = SentenceTransformer(model_path)
+model = SentenceTransformer(model_name)
 
 
 # ============================================================
@@ -228,42 +224,61 @@ STUDENT QUESTION:
 
 
     # --------------------------------------------------------
-    # 6. Send request to local Ollama
-    # --------------------------------------------------------
+    # 6. Generate answer using local Ollama or a hosted API
+
+    llm_provider = os.getenv("LLM_PROVIDER", "ollama").lower()
 
     try:
+        if llm_provider == "ollama":
+            response = requests.post(
+                "http://localhost:11434/api/chat",
+                json={
+                    "model": "qwen3:1.7b",
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ],
+                    "stream": False
+                },
+                timeout=120
+            )
+            response.raise_for_status()
+            answer = response.json()["message"]["content"]
 
-        response = requests.post(
-            "http://localhost:11434/api/chat",
-            json={
-                "model": "qwen3:1.7b",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "stream": False
-            },
-            timeout=120
-        )
+        elif llm_provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                return "Error: OPENAI_API_KEY is not configured.", retrieved_chunks
+
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": os.getenv("OPENAI_MODEL", "gpt-4.1-mini"),
+                    "messages": [{"role": "user", "content": prompt}]
+                },
+                timeout=300
+            )
+            response.raise_for_status()
+            answer = response.json()["choices"][0]["message"]["content"]
+
+        else:
+            return f"Error: Unsupported LLM_PROVIDER '{llm_provider}'.", retrieved_chunks
 
     except requests.exceptions.ConnectionError:
-
-        return (
-            "Error: Ollama is not running. "
-            "Please start Ollama and try again.",
-            retrieved_chunks
-        )
-
+        return "Error: Could not connect to the configured LLM provider.", retrieved_chunks
     except requests.exceptions.Timeout:
+        return "Error: The LLM provider took too long to respond.", retrieved_chunks
+    except requests.exceptions.HTTPError as e:
+        return f"Error from LLM provider: {e.response.status_code} — {e.response.text[:500]}", retrieved_chunks
+    except (KeyError, ValueError) as e:
+        return f"Error reading the LLM response: {e}", retrieved_chunks
 
-        return (
-            "Error: Ollama took too long to respond.",
-            retrieved_chunks
-        )
 
 
+    
     # --------------------------------------------------------
     # 7. Handle Ollama errors
     # --------------------------------------------------------

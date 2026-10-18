@@ -7,7 +7,6 @@ from scripts.rag import ask_question
 app = FastAPI(title="MIT AI Teaching Assistant")
 
 
-# Allow Vite frontend to communicate with FastAPI
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -18,6 +17,48 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def parse_answer(answer: str):
+    sections = {
+        "explanation": "",
+        "intuition": "",
+        "example": "",
+        "takeaway": "",
+    }
+
+    current = None
+
+    for line in answer.splitlines():
+        line_clean = line.strip()
+
+        if line_clean.lower().startswith("### explanation"):
+            current = "explanation"
+            continue
+
+        if line_clean.lower().startswith("### intuition"):
+            current = "intuition"
+            continue
+
+        if line_clean.lower().startswith("### example"):
+            current = "example"
+            continue
+
+        if line_clean.lower().startswith("### key takeaway"):
+            current = "takeaway"
+            continue
+
+        if line_clean.lower().startswith("### sources"):
+            current = None
+            continue
+
+        if current:
+            sections[current] += line + "\n"
+
+    for key in sections:
+        sections[key] = sections[key].strip()
+
+    return sections
 
 
 @app.get("/")
@@ -45,8 +86,13 @@ def ask(data: dict):
 
     answer, sources = ask_question(question)
 
+    parsed = parse_answer(answer)
+
     return {
-        "answer": answer,
+        "explanation": parsed["explanation"],
+        "intuition": parsed["intuition"],
+        "example": parsed["example"],
+        "takeaway": parsed["takeaway"],
         "sources": [
             {
                 "lecture": source["lecture"],
