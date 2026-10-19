@@ -1,5 +1,4 @@
-const API_BASE = "http://127.0.0.1:8000";
-
+const API_BASE = "https://mit-ai-teaching-assistant.onrender.com";
 export async function askQuestion(question) {
   const response = await fetch(`${API_BASE}/ask`, {
     method: "POST",
